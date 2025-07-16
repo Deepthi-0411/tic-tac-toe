@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe with AI & Voice Assistant</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: 'Poppins', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 120px);
+            grid-template-rows: repeat(3, 120px);
+            gap: 8px;
+            margin: 20px auto;
+            width: 380px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            position: relative;
+        }
+
+        .cell {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            background: #333;
+            cursor: pointer;
+            border: 2px solid #0ff;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .cell.X { color: #ff4444; text-shadow: 0 0 10px #ff4444; }
+        .cell.O { color: #44ff44; text-shadow: 0 0 10px #44ff44; }
+        
+
+        .winner-cell {animation: glow 0.5s infinite alternate; }
+
+         @keyframes glow {
+             0% { box-shadow: 0 0 10px #ffcc00; }
+             50% { box-shadow: 0 0 20px #ffcc00; }
+             100% { box-shadow: 0 0 30px #ffcc00; }
+        }
+
+        .winner-message {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 20px;
+            color: #ffcc00;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            margin: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+            background: linear-gradient(45deg, #ff6b6b, #ffcc00);
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body onload="startGame()">
+    <h1>Tic-Tac-Toe with AI & Voice Assistant</h1>
+    <p>Select your symbol: 
+        <button onclick="setPlayer('X')">X</button> 
+        <button onclick="setPlayer('O')">O</button>
+    </p>
+    <p>Voice Announcements: <input type="checkbox" id="voiceToggle" checked></p>
+    <div class="board" id="board"></div>
+    <p id="winner-message" class="winner-message"></p>
+    <button onclick="resetGame()">Restart Game</button>
+    
+    <script>
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let aiPlayer = 'O';
+        let gameActive = true;
+
+        function startGame() {
+            resetGame();
+            speak("Game starts! Select your symbol.");
+        }
+
+        function setPlayer(player) {
+            currentPlayer = player;
+            aiPlayer = player === 'X' ? 'O' : 'X';
+            speak(`You selected ${player}. Game starts now!`);
+            resetGame();
+        }
+
+        function renderBoard() {
+            let boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            board.forEach((cell, index) => {
+                let cellDiv = document.createElement('div');
+                cellDiv.classList.add('cell');
+                if (cell !== '') {
+                    cellDiv.classList.add(cell);
+                    cellDiv.textContent = cell;
+                }
+                cellDiv.onclick = () => handleMove(index);
+                boardDiv.appendChild(cellDiv);
+            });
+        }
+
+        function speak(message) {
+            if (!document.getElementById('voiceToggle').checked) return;
+            let utterance = new SpeechSynthesisUtterance(message);
+            speechSynthesis.speak(utterance);
+        }
+
+        function handleMove(index) {
+            if (!gameActive || board[index] !== '') return;
+            board[index] = currentPlayer;
+            renderBoard();
+            speak(`You chose cell ${index + 1}`);
+            if (checkWinner(currentPlayer)) return;
+            setTimeout(aiMove, 800);
+        }
+
+        function aiMove() {
+            if (!gameActive) return;
+            let bestMove = minimax(board, aiPlayer).index;
+            board[bestMove] = aiPlayer;
+            renderBoard();
+            speak(`AI chooses cell ${bestMove + 1}`);
+            checkWinner(aiPlayer);
+        }
+
+        function minimax(newBoard, player) {
+            let emptyCells = newBoard.map((val, i) => val === '' ? i : null).filter(v => v !== null);
+            if (checkWinner(aiPlayer)) return { score: 1 };
+            if (checkWinner(currentPlayer)) return { score: -1 };
+            if (emptyCells.length === 0) return { score: 0 };
+
+            let moves = [];
+            for (let i of emptyCells) {
+                let move = {};
+                move.index = i;
+                newBoard[i] = player;
+                move.score = player === aiPlayer ? minimax(newBoard, currentPlayer).score : minimax(newBoard, aiPlayer).score;
+                newBoard[i] = '';
+                moves.push(move);
+            }
+
+            return moves.reduce((best, move) => (player === aiPlayer ? move.score > best.score : move.score < best.score) ? move : best);
+        }
+
+        function checkWinner(player) {
+            const winPatterns = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]];
+            for (let pattern of winPatterns) {
+                if (pattern.every(i => board[i] === player)) {
+                    gameActive = false;
+                    pattern.forEach(i => document.getElementsByClassName('cell')[i].classList.add('winning-cell'));
+                    document.getElementById('winner-message').textContent = `${player} Wins!`;
+                    speak(`${player} Wins! Game Over.`);
+                    return true;
+                }
+            }
+            if (!board.includes('')) {
+                document.getElementById('winner-message').textContent = `It's a draw!`;
+                speak(`It's a draw!`);
+                gameActive = false;
+                return true;
+            }
+            return false;
+        }
+
+        function resetGame() {
+            board.fill('');
+            gameActive = true;
+            document.getElementById('winner-message').textContent = '';
+            renderBoard();
+            speak("Game restarted!");
+        }
+    </script>
+</body>
+</html>
